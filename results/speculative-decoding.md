@@ -30,3 +30,13 @@ the table above. Ornith 1.0 has no MTP head; Ornith 1.5 has one:
 
 Verdict: MTP works where a separate draft model fails, because the guesses come from the model itself. It pays above
 ~55% acceptance, so on this phone it is an opt-in preset for coding and editing, not the default.
+
+## Cheaper 2-token checks (2026-11-15)
+A kernel that reads Ornith's 4-bit weights once for two tokens: checking 2 tokens 0.53 -> 0.44 s (+21%), identical
+output. With it, MTP guessing one token per round: code 3.33, prose 3.15, edits 3.41 tok/s (plain: 3.27 / 3.13 / 3.13),
+so roughly break-even: each MTP guess runs the full output layer (1.1 GB). Guessing 3 tokens per round stays best for
+code and edits.
+
+## Ternary 27B with a small draft model
+No MTP layer exists for Bonsai 2 27B. A Qwen3.5-0.8B draft (same tokenizer) ran at 0.31 tok/s vs 1.22 without it,
+with 49% of guesses accepted, in our first setup (draft and 27B sharing the same 4 cores). Not a verdict yet.
