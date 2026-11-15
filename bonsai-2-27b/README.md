@@ -23,7 +23,7 @@ recipe makes the CPU read ternary weights as cheaply as possible and gives part 
 
 - `prism-ml/Ternary-Bonsai-2-27B-gguf`, file `Ternary-Bonsai-2-27B-PTQ1_0.gguf` (5.95 GB). No requantizing:
   PTQ1_0 is the native ternary format.
-- Our llama.cpp fork, branch `mali-port`: the PrismML llama.cpp (PTQ1_0 support) plus:
+- Our llama.cpp fork, [llama.cpp-s10](https://github.com/tannerbruhn/llama.cpp-s10): the PrismML llama.cpp (PTQ1_0 support) plus:
   - a two-row PTQ1_0 dot kernel with prefetch of the next row pair (generation, CPU only 0.76 -> 0.86);
   - a decode-once prompt kernel that unpacks each row pair once and reuses it for every token (CPU pp +33%);
   - the GPU assist `ggml-cpu/s10-gpu-assist.c`: on each PTQ1_0 matrix-vector product the GPU computes the first
@@ -73,7 +73,7 @@ Why these settings:
 
 ## Steps and dead ends
 
-Every step was measured and committed separately; the full log is `gpu/ASSIST.md` in the work repo. Things that
+Every step was measured and committed separately; each commit message in the llama.cpp-s10 history carries its measured gain. Things that
 did not help: a third and fourth row in the CPU kernel (register spills), an 8-column GPU prompt kernel
 (1.38 vs 1.97 tok/s), huge pages (TLB cost was only 1-2%), and rates outside Samsung's DVFS table (rejected by
 the firmware).

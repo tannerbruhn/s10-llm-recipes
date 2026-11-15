@@ -20,7 +20,7 @@ Through the server (one 48-token answer, the GPU not involved): prompt 7.4-7.6, 
 
 - `bartowski/deepreinforce-ai_Ornith-1.0-9B-GGUF`: the BF16 GGUF and its `imatrix.gguf`
   (calibration_datav5, 248 entries).
-- Our llama.cpp fork (branch `mali-port`) built on any desktop or server: `llama-quantize`, `llama-perplexity`.
+- Our llama.cpp fork ([llama.cpp-s10](https://github.com/tannerbruhn/llama.cpp-s10)) built on any desktop or server: `llama-quantize`, `llama-perplexity`.
 
 ## 2. Quantize
 

@@ -16,8 +16,8 @@ Both models run behind one OpenAI-compatible server that swaps between them on d
 ## What you need
 
 - The phone setup in [setup/](setup/): postmarketOS with the Wi-Fi and GPU kernel/U-Boot forks.
-- Our llama.cpp fork, branch `mali-port`: the PrismML llama.cpp (for PTQ1_0) with ARM kernels for PTQ1_0 and a
-  Mali GPU assist for the 27B.
+- Our llama.cpp fork, [tannerbruhn/llama.cpp-s10](https://github.com/tannerbruhn/llama.cpp-s10) (`main`): the PrismML
+  llama.cpp (for PTQ1_0) with ARM kernels for PTQ1_0 and a Mali GPU assist for the 27B.
 - For the 27B only: Mesa Rusticl (OpenCL) with a small Bifrost patch, see the 27B recipe.
 
 ## Measuring
