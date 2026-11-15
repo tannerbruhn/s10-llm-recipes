@@ -45,7 +45,6 @@ Why each flag:
 - IQ4_NL instead of Q4_0: same size and speed on this CPU, much better quality. Our best Q4_0 mix stayed 5.4% above
   BF16 in perplexity; the same mix in IQ4_NL is 2.1% above.
 
-The mixes tried along the way (M1-M6) and their perplexities are in [STEPS.md](STEPS.md).
 
 ## 3. Check quality (optional, off the phone)
 
