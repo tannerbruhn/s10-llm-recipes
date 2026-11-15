@@ -13,6 +13,8 @@ recipe makes the CPU read ternary weights as cheaply as possible and gives part 
 | **our fork, CPU + GPU (FRAC 0.45)** | **1.98** | **1.21-1.27** |
 
 - Sustained: tg128 1.17 tok/s at 702 MHz, with no thermal-guard pauses.
+- Server, heat-soaked, two 256-token answers back to back: 1.12 then 1.07 tok/s. The second one had one 6 s
+  thermal-guard pause (CPU 10 s average 88.2 C), and the guard cut the charge current once (board 61 C).
 - Through the server: one 48-token answer gave prompt 1.80 and generation 1.21 tok/s.
 - Output with the GPU is identical to CPU-only greedy output. Perplexity on wikitext-2 (12x512) is 11.1794 with
   and without the new prompt kernel.
