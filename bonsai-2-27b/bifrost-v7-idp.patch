@@ -1,0 +1,77 @@
+pan/bi: use *IDP.v4i8 for 4x8 dot products on Bifrost v7
+
+Mali-G52/G76 (arch 7) have a 4-way int8 dot product (*IDP.v4i8, FMA unit),
+but the compiler only enabled NIR's sdot/udot ops for Valhall (and v7 shared the v6 NIR options), so on v7 every
+OpenCL dot(char4, char4) became 4 sign-extends, 4 IMULs and 3 IADDs.
+*IDP.v4i8 has no accumulator and no saturation: emit it plus an IADD, and
+keep the _sat variants lowered in NIR (has_*dot_4x8_sat stays arch >= 9).
+The source abs bit selects sign extension (see compiler.h). v7 gets its own
+NIR options so has_sdot_4x8/has_udot_4x8 can differ from v6.
+
+--- a/src/panfrost/compiler/bifrost/bifrost_compile.h	2026-11-14 08:17:11.211649162 +0100
++++ b/src/panfrost/compiler/bifrost/bifrost_compile.h	2026-11-14 08:20:52.059696356 +0100
+@@ -149,9 +149,9 @@
+       .lower_hadd = arch >= 11,                                                \
+       .lower_hadd64 = true,                                                    \
+       .discard_is_demote = true,                                               \
+-      .has_udot_4x8 = arch >= 9,                                               \
++      .has_udot_4x8 = arch >= 7,                                               \
+       .has_udot_4x8_sat = arch >= 9,                                           \
+-      .has_sdot_4x8 = arch >= 9,                                               \
++      .has_sdot_4x8 = arch >= 7,                                               \
+       .has_sdot_4x8_sat = arch >= 9,                                           \
+                                                                                \
+       .divergence_analysis_options = merge_workgroups ?                        \
+@@ -161,6 +161,7 @@
+    };
+ 
+ DEFINE_OPTIONS(bifrost_nir_options_v6, 6, false);
++DEFINE_OPTIONS(bifrost_nir_options_v7, 7, false);
+ DEFINE_OPTIONS(bifrost_nir_options_v9, 9, false);
+ DEFINE_OPTIONS(bifrost_nir_options_v9_merge_wg, 9, true);
+ DEFINE_OPTIONS(bifrost_nir_options_v11, 11, false);
+--- a/src/panfrost/compiler/bifrost/bifrost_compile.c	2026-11-14 08:17:11.210392590 +0100
++++ b/src/panfrost/compiler/bifrost/bifrost_compile.c	2026-11-14 08:17:11.220646989 +0100
+@@ -3442,6 +3442,13 @@
+    }
+    case nir_op_udot_4x8_uadd_sat:
+    case nir_op_udot_4x8_uadd: {
++      if (b->shader->arch < 9) {
++         /* v7 *IDP.v4i8: no accumulator, no saturation (the _sat ops are lowered in NIR) */
++         assert(instr->op == nir_op_udot_4x8_uadd);
++         bi_index t = bi_idp_v4i8(b, s0, s1);
++         bi_iadd_u32_to(b, dst, t, s2, false);
++         break;
++      }
+       assert(b->shader->arch >= 9);
+       bi_idpadd_v4u8_to(b, dst, s0, s1, s2,
+                         instr->op == nir_op_udot_4x8_uadd_sat);
+@@ -3449,6 +3456,13 @@
+    }
+    case nir_op_sdot_4x8_iadd_sat:
+    case nir_op_sdot_4x8_iadd: {
++      if (b->shader->arch < 9) {
++         /* v7 *IDP.v4i8: the source abs bit selects sign extension */
++         assert(instr->op == nir_op_sdot_4x8_iadd);
++         bi_index t = bi_idp_v4i8(b, bi_abs(s0), bi_abs(s1));
++         bi_iadd_s32_to(b, dst, t, s2, false);
++         break;
++      }
+       assert(b->shader->arch >= 9);
+       bi_idpadd_v4s8_to(b, dst, s0, s1, s2,
+                         instr->op == nir_op_sdot_4x8_iadd_sat);
+--- a/src/panfrost/compiler/pan_compiler.c	2026-11-14 08:20:52.047446993 +0100
++++ b/src/panfrost/compiler/pan_compiler.c	2026-11-14 08:20:52.059859747 +0100
+@@ -88,9 +88,11 @@
+       assert(!merge_wg);
+       return &midgard_nir_options;
+    case 6:
+-   case 7:
+       assert(!merge_wg);
+       return &bifrost_nir_options_v6;
++   case 7:
++      assert(!merge_wg);
++      return &bifrost_nir_options_v7;
+    case 9:
+    case 10:
+       return merge_wg ? &bifrost_nir_options_v9_merge_wg :
