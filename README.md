@@ -23,10 +23,11 @@ Updates: [@t24_lab on X](https://x.com/t24_lab)
 
 | Recipe | Model | File | Prompt tok/s | Generation tok/s | Quality |
 |---|---|---|---|---|---|
-| [ornith-1.0-9b](ornith-1.0-9b/) | Ornith 1.0 9B | own IQ4_NL mix, 5.78 GB | 7.4-7.9 | **3.33** | wikitext PPL 9.23 (BF16 9.04) |
+| [ornith-1.5-9b](ornith-1.5-9b/) | Ornith 1.5 9B (default) | own IQ4_NL mix + MTP layer, 6.04 GB | ~7.5 | **3.33**; with MTP 3.94 code / 4.48 edits | hard set 6/8 (thinking) |
+| [ornith-1.0-9b](ornith-1.0-9b/) | Ornith 1.0 9B (previous) | own IQ4_NL mix, 5.78 GB | 7.4-7.9 | 3.33 | wikitext PPL 9.23 (BF16 9.04) |
 | [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB | ~2.0 | **1.21** | ternary as published |
 
-Both models run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
+All of them run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
 
 Everything else we measured, including what did not work: [results/](results/).
 

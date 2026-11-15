@@ -19,6 +19,7 @@ kernel work. Current numbers for the two models we serve are in the recipes.
 ## Now, with our fork (2026-11-15)
 | Model | Prompt | Generation |
 |---|---|---|
+| Ornith 1.5 9B, our IQ4_NL mix + MTP layer | ~7.5 | 3.33 (MTP: 3.94 code, 4.48 edits) |
 | Ornith 1.0 9B, our IQ4_NL mix | 7.9 | 3.33 |
 | Bonsai 2 27B, CPU + GPU | ~2.0 | 1.21-1.27 |
 | Bonsai 2 9B, CPU + GPU | 6.9 | ~3.0 |
@@ -28,10 +29,12 @@ kernel work. Current numbers for the two models we serve are in the recipes.
 |---|---|
 | **Bonsai 2 27B, thinking** (budget 1000) | **8/8**, the only model to write the constrained verse correctly |
 | Ornith 1.0 9B, thinking (budget 1000) | 7/8 |
+| Ornith 1.5 9B, thinking (budget 1000), our quant + MTP | 6/8 (missed the clock-cap trap) |
+| Ornith 1.5 9B, no thinking | 3/8 (Ornith 1.0 same day: 2/8) |
 | Bonsai 2 27B, no thinking | 3/8 |
 | Ornith 1.0 9B, no thinking | 3/8 |
 | Qwen3.5-9B, no thinking | 2.5/8 |
 
-Verdict: Ornith is the daily model (fast enough to chat). The 27B is for hard questions where waiting is fine.
+Verdict: Ornith 1.5 is the daily model (equal to 1.0 within noise on this set, faster with MTP on code) (fast enough to chat). The 27B is for hard questions where waiting is fine.
 Bonsai 2 9B is as fast as Ornith on our stack but gave worse answers, so it is not served. Eight questions is a
 small set; treat the scores as a hint, not a ranking.

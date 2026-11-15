@@ -1,5 +1,5 @@
 [Unit]
-Description=S10 LLM router (our llama.cpp fork: Ornith 1.0 9B M5 default, Bonsai 27B with GPU assist; OpenAI API, no web UI)
+Description=S10 LLM router (our llama.cpp fork: Ornith 1.5 9B M5+MTP default, Ornith 1.0 9B, Bonsai 27B with GPU assist; OpenAI API, no web UI)
 After=network-online.target s10-cpucap.service s10-thermal-guard.service s10-gpu-cap.service
 Wants=network-online.target
 
@@ -10,8 +10,8 @@ Group=user
 Environment=LD_LIBRARY_PATH=/home/user/llama-mali/build-mali/bin
 Environment=OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost GGML_OPENCL_PLATFORM=0
 Environment=GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_MINMB=6
-# Requests with no or an unknown "model" go to Ornith, as with the old single-model server (fork patch).
-Environment=LLAMA_ROUTER_DEFAULT_MODEL=ornith-1.0-9b
+# Requests with no or an unknown "model" go to the default model, as with the old single-model server (fork patch).
+Environment=LLAMA_ROUTER_DEFAULT_MODEL=ornith-1.5-9b
 # GPU at Samsung's stock 702 MHz while serving (the governor does not ramp for the bursty assist, so pin it;
 # the GPU runtime-suspends when idle). Back to the boot cap of 433 MHz on stop.
 ExecStartPre=+/bin/sh -c 'D=/sys/class/devfreq/18500000.gpu; echo 156000000 > $D/min_freq; echo 702000000 > $D/max_freq; echo 702000000 > $D/min_freq'

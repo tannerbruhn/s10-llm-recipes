@@ -18,4 +18,15 @@ A small model guesses the next tokens and Ornith checks several at once.
 
 Verdict: not a default on this phone. Checking tokens is compute-bound on a phone CPU, so wrong guesses cost almost
 as much as generating. Only copy-heavy edits gain (+43-47%). DFlash-style drafts (16-token blocks) are ruled out by
-the table above. Ornith 1.0 has no MTP head; Ornith 1.5 has one (not tested yet).
+the table above. Ornith 1.0 has no MTP head; Ornith 1.5 has one:
+
+## Ornith 1.5 with its own MTP layer (2026-11-15)
+| Text | tok/s (no MTP: 3.33) | guesses accepted |
+|---|---|---|
+| code | **3.94** (+18%) | 74% |
+| copy/edit | **4.48** (+35%) | 88% |
+| long prose | 3.26 (-2%) | 55% |
+| short prose | 2.89 (-13%) | 45% |
+
+Verdict: MTP works where a separate draft model fails, because the guesses come from the model itself. It pays above
+~55% acceptance, so on this phone it is an opt-in preset for coding and editing, not the default.

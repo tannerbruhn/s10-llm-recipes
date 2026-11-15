@@ -1,5 +1,7 @@
 # Ornith 1.0 9B on the S10: own IQ4_NL mix "S10-M5"
 
+> Superseded as the default by [Ornith 1.5](../ornith-1.5-9b/) (same speed, adds MTP); still served as `ornith-1.0-9b`.
+
 Ornith-1.0-9B (deepreinforce-ai / ornith-ai) is a hybrid model: Gated DeltaNet layers plus 8 full-attention
 layers. This recipe keeps quality close to Q4_K_M while using only tensor types that have fast ARM repack paths in
 our fork (IQ4_NL and Q8_0), so it generates 7% faster than the best previous setup (ik_llama.cpp + Q4_K_M).
