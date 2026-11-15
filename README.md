@@ -5,6 +5,7 @@ Each folder is one model: where the weights come from, how to quantize them, how
 All numbers are from one phone, measured with the scripts named in each recipe.
 
 This repo was AI-written and tested on real hardware.
+Updates: [@t24_lab on X](https://x.com/t24_lab).
 
 | Recipe | Model | File | Prompt tok/s | Generation tok/s | Quality |
 |---|---|---|---|---|---|
