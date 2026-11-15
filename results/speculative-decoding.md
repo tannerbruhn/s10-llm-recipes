@@ -38,5 +38,12 @@ so roughly break-even: each MTP guess runs the full output layer (1.1 GB). Guess
 code and edits.
 
 ## Ternary 27B with a small draft model
-No MTP layer exists for Bonsai 2 27B. A Qwen3.5-0.8B draft (same tokenizer) ran at 0.31 tok/s vs 1.22 without it,
-with 49% of guesses accepted, in our first setup (draft and 27B sharing the same 4 cores). Not a verdict yet.
+No MTP layer exists for Bonsai 2 27B. A Qwen3.5-0.8B draft (same tokenizer) runs at 0.31 tok/s vs 1.20 without it
+(49% of guesses accepted), whether the draft runs on the big or the little cores.
+
+| 27B, tokens checked at once | 1 | 2 | 4 |
+|---|---|---|---|
+| seconds per check | 0.83 | 1.39 | 2.50 |
+
+Verdict: dead end. The ternary 27B is compute-bound, so checking 4 tokens costs 3x one; a draft would need >90%
+acceptance (4 tokens) or >76% (1 token) just to break even.

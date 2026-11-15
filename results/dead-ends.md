@@ -15,3 +15,4 @@ Things we tried and dropped, with the number that decided it.
 | Plain Q4_0 for Ornith | best Q4_0 mix 5.4% worse perplexity than BF16; IQ4_NL at the same size is 2.1% |
 | Bonsai 2 9B as a daily model | as fast as Ornith (~3.0 tok/s) but worse answers |
 | GPU share 0.35 instead of 0.45 for the 27B | prompts 5-10% faster, generation ~10% slower |
+| Speculative decoding for the 27B (0.8B draft) | 0.31 tok/s vs 1.20; checking 4 tokens costs 3x one |
