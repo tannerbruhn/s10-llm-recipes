@@ -5,7 +5,21 @@ Each folder is one model: where the weights come from, how to quantize them, how
 All numbers are from one phone, measured with the scripts named in each recipe.
 
 This repo was AI-written and tested on real hardware.
-Updates: [@t24_lab on X](https://x.com/t24_lab).
+
+## The S10 project
+
+These four repos turn an old Samsung Galaxy S10 (SM-G973F, Exynos 9820) into a small always-on LLM server under
+postmarketOS. The kernel and U-Boot forks are general S10 support; the other two are the LLM side.
+
+- [exynos-9820-mainline-linux](https://github.com/tannerbruhn/exynos-9820-mainline-linux): kernel (Wi-Fi, charger,
+  Mali-G76 GPU through Panfrost)
+- [u-boot](https://github.com/tannerbruhn/u-boot): bootloader and device tree (Wi-Fi, reserved memory, GPU node and
+  clocks)
+- [llama.cpp-s10](https://github.com/tannerbruhn/llama.cpp-s10): inference (ternary CPU kernels, Mali GPU assist)
+- [s10-llm-recipes](https://github.com/tannerbruhn/s10-llm-recipes): models, quantization, server setup, measured
+  numbers
+
+Updates: [@t24_lab on X](https://x.com/t24_lab)
 
 | Recipe | Model | File | Prompt tok/s | Generation tok/s | Quality |
 |---|---|---|---|---|---|
