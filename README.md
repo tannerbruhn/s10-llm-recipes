@@ -28,6 +28,8 @@ Updates: [@t24_lab on X](https://x.com/t24_lab)
 
 Both models run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
 
+Everything else we measured, including what did not work: [results/](results/).
+
 ## What you need
 
 - The phone setup in [setup/](setup/): postmarketOS with the Wi-Fi and GPU kernel/U-Boot forks.
