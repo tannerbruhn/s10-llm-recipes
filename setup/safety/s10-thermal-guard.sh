@@ -15,6 +15,7 @@
 #               the charge voltage is held at <= 4.00 V (about 60-65 %), whatever udev or the driver says
 #  critical     CPU > 100 C on 2 polls in a row, or die > 85 C -> freeze + clamp + charger off; if still
 #               critical after 60 s (or CPU > 105 C) -> poweroff, forced if the orderly one hangs
+#  hold         touch /run/s10-charge-hold: charger off until the file is removed (or a reboot)
 #  blind        any zone missing, or all readings frozen for 2 min while busy -> treated as hot
 # Every action is re-asserted, not written once (udev, cable events and new processes can undo them).
 # Runs under a systemd watchdog (Type=notify, WatchdogSec): a hung guard is killed and restarted, and
@@ -61,6 +62,7 @@ clamp() {
 reg() { i2cget -f -y $I2C $1 2>/dev/null; }
 regw() { i2cset -f -y $I2C $1 $(printf 0x%02x $2) 2>/dev/null; }
 charger() {   # 1 = charging allowed, 0 = off; re-asserted, writes only on difference
+  set -- $1; [ -e /run/s10-charge-hold ] && set -- 0   # manual hold: touch /run/s10-charge-hold (gone at reboot)
   r=$(reg 0xb7) || r=
   if [ -n "$r" ]; then
     want=$(( ($r & 0xfe) | $1 )); [ $want -ne $(( $r )) ] && regw 0xb7 $want
