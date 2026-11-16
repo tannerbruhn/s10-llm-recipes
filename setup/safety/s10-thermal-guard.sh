@@ -33,6 +33,9 @@ I2C="1 0x69"        # MAX77705 charger: 0xb4 DETAILS_01, 0xb7 CNFG_00, 0xb8 CNFG
 
 log() { echo "$*"; }    # stdout: journald always attributes it to the unit
 zpath() { for z in /sys/class/thermal/thermal_zone*; do read t < $z/type; [ "$t" = "$1" ] && echo $z/temp; done; }
+# Test hooks (unset in service): fake zone files, faster polls, a harmless poweroff.
+[ -n "$GUARD_TEST_ZDIR" ] && zpath() { echo $GUARD_TEST_ZDIR/$1; }
+POLL=${GUARD_TEST_POLL:-2}; POWEROFF=${GUARD_TEST_POWEROFF:-poweroff}
 Z0=$(zpath cpucl0-thermal); Z1=$(zpath cpucl1-thermal); Z2=$(zpath cpucl2-thermal)
 ZG=$(zpath g3d-thermal); ZI=$(zpath isp-thermal)
 rz() { v=0; [ -n "$1" ] && read v < $1 2>/dev/null; case "$v" in ''|*[!0-9]*) v=0 ;; esac; }   # -> $v
@@ -118,8 +121,10 @@ while true; do
     crit=$((crit + 1)); paused=1; chg=0; freeze 1; clamp 1; charger 0
     if [ $crit -ge 30 ] || [ $cpu -gt 105000 ]; then
       log "CRITICAL for $((crit * 2)) s, cpu=$cpu die=$isp -> poweroff"; sync
-      systemctl poweroff --no-block; sleep 45
-      log "orderly poweroff hung -> forced"; systemctl poweroff -ff; sleep 10; echo o > /proc/sysrq-trigger
+      if [ "$POWEROFF" = poweroff ]; then
+        systemctl poweroff --no-block; sleep 45
+        log "orderly poweroff hung -> forced"; systemctl poweroff -ff; sleep 10; echo o > /proc/sysrq-trigger
+      else $POWEROFF; exit 0; fi
     fi
   else
     crit=0
@@ -144,5 +149,5 @@ while true; do
   fi
   [ $((tick % 30)) = 0 ] && housekeeping
   [ $((tick % 300)) = 0 ] && status
-  sleep 2
+  sleep $POLL
 done
