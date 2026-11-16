@@ -1,0 +1,13 @@
+[Unit]
+Description=S10: cap big-core clocks (heat; decode is memory-bound anyway)
+After=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# policy6 = Exynos M4 pair (max 2.53 GHz), policy4 = Cortex-A75 pair (max 2.31 GHz)
+ExecStart=/bin/sh -c 'echo 1976000 > /sys/devices/system/cpu/cpufreq/policy6/scaling_max_freq; echo 1898000 > /sys/devices/system/cpu/cpufreq/policy4/scaling_max_freq'
+ExecStop=/bin/sh -c 'cat /sys/devices/system/cpu/cpufreq/policy6/cpuinfo_max_freq > /sys/devices/system/cpu/cpufreq/policy6/scaling_max_freq; cat /sys/devices/system/cpu/cpufreq/policy4/cpuinfo_max_freq > /sys/devices/system/cpu/cpufreq/policy4/scaling_max_freq'
+
+[Install]
+WantedBy=multi-user.target

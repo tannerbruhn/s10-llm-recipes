@@ -1,7 +1,10 @@
 [Unit]
 Description=S10 LLM router (our llama.cpp fork: Ornith 1.5 9B M5+MTP default, Ornith 1.0 9B, Bonsai 27B with GPU assist; OpenAI API, no web UI)
 After=network-online.target s10-cpucap.service s10-thermal-guard.service s10-gpu-cap.service
-Wants=network-online.target
+# Never serve without the thermal guard: Wants= starts it, the ExecStartPre check refuses to start without it,
+# and s10-guard-failed.service stops this unit if the guard stays down. (Not Requires=: systemd would restart
+# the LLM, and kill a running answer, every time the guard's watchdog restarts it.)
+Wants=network-online.target s10-thermal-guard.service
 
 [Service]
 User=user
@@ -14,13 +17,14 @@ Environment=GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_MINMB=6
 Environment=LLAMA_ROUTER_DEFAULT_MODEL=ornith-1.5-9b
 # GPU at Samsung's stock 702 MHz while serving (the governor does not ramp for the bursty assist, so pin it;
 # the GPU runtime-suspends when idle). Back to the boot cap of 433 MHz on stop.
+ExecStartPre=/usr/sbin/systemctl is-active --quiet s10-thermal-guard.service
 ExecStartPre=+/bin/sh -c 'D=/sys/class/devfreq/18500000.gpu; echo 156000000 > $D/min_freq; echo 702000000 > $D/max_freq; echo 702000000 > $D/min_freq'
 ExecStart=/home/user/llama-mali/build-mali/bin/llama-server \
   --models-preset /etc/s10-llm/s10-models.ini --models-max 1 \
   --host 0.0.0.0 --port 8080 --no-webui \
   --api-key-file /etc/s10-llm/api-key
 ExecStopPost=+/bin/sh -c 'D=/sys/class/devfreq/18500000.gpu; echo 156000000 > $D/min_freq; echo 433000000 > $D/max_freq'
-# The thermal guard may SIGSTOP the router and its model process when hot.
+# The thermal guard freezes this unit's cgroup (and SIGSTOPs llama-*) when hot.
 Restart=on-failure
 RestartSec=10
 

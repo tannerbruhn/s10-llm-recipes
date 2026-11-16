@@ -1,0 +1,24 @@
+[Unit]
+Description=S10 thermal safety guard (freeze LLM, charger off, poweroff on overheat)
+After=basic.target
+# A guard that keeps crashing stops the LLM and the charging instead of running blind.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+OnFailure=s10-guard-failed.service
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/local/bin/s10-thermal-guard
+# The guard pings every 10 s; a hung or stopped guard is killed and restarted.
+WatchdogSec=30
+Restart=always
+RestartSec=2
+# Never the victim of memory pressure, and kept off the big cores the LLM saturates.
+OOMScoreAdjust=-1000
+ManagedOOMPreference=omit
+CPUAffinity=0-3
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=S10: thermal guard down, stop the LLM and charging
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+# OnFailure= fires on every failure, also the ones Restart= recovers from in 2 s: act only if the guard stays down.
+ExecStart=/bin/sh -c 'sleep 15; if systemctl is-active -q s10-thermal-guard.service; then echo "guard recovered by itself"; exit 0; fi; systemctl stop --no-block s10-llm.service; i2cset -f -y 1 0x69 0xb7 0x04; echo 100000 > /sys/class/power_supply/max77705-charger/constant_charge_current; echo "guard down: LLM stopped, charger off"'

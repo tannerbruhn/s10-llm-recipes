@@ -44,5 +44,5 @@ Everything else we measured, including what did not work: [results/](results/).
   alternate A/B runs (noise is about +/-0.03 tok/s). The charger is on, as in service.
 - Perplexity uses wikitext-2 test, 12 chunks of 512 tokens. A desktop build of the same fork gives the same
   value as the phone within 0.2%, so quality runs can be done off the phone.
-- Heat: the phone runs a thermal guard (pause at a 10 s CPU average above 88 C or a board temperature above 75 C,
-  reduced charging above a board temperature of 60 C). None of the results here needed a pause.
+- Heat: the phone runs the thermal guard from [setup/safety](setup/safety/) (pause at a 10 s CPU average above 88 C or
+  a die temperature above 75 C; charging off above a die temperature of 60 C). None of the results here needed a pause.

@@ -1,0 +1,14 @@
+[Unit]
+Description=S10: cap the GPU at 433 MHz at boot (572/650/702 only for explicit tests)
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target
+ConditionPathExists=/sys/class/devfreq/18500000.gpu/max_freq
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo 433000000 > /sys/class/devfreq/18500000.gpu/max_freq'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

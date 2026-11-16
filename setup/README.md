@@ -13,6 +13,7 @@ postmarketOS device (Wi-Fi, charging, GPU). The LLM recipes build on them.
   Mali-G76 GPU node (adapted from Gregor Sprint's work in omnipha/linux-samsung-s10-exynos9820) and the GPU rates up
   to the stock 702 MHz, and the watchdog node.
 - **CPU:** 2 Samsung M4 (cpus 6-7), 2 Cortex-A75 (cpus 4-5), 4 Cortex-A55 (cpus 0-3); 8 GB LPDDR4X.
-- **Safety for a phone that runs 24/7 on the charger:** a thermal guard (pause heavy jobs when hot, cut the charge
-  current when the board is warm, clean power-off at the critical limits), and the hardware watchdog: if the system
-  hangs, the phone resets itself after 60 s instead of staying dead.
+- **Safety for a phone that runs 24/7 on the charger:** [safety/](safety/) has the thermal guard (freeze heavy jobs
+  and clamp clocks when hot, charging off while the die or the estimated battery temperature is warm, poweroff at
+  the critical limits), the clock caps and the charge limit, with an install script. Install them before the LLM
+  service. The hardware watchdog resets the phone after 60 s if the system hangs.
