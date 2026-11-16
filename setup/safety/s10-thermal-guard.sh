@@ -15,6 +15,8 @@
 #               the charge voltage is held at <= 4.00 V (about 60-65 %), whatever udev or the driver says
 #  critical     CPU > 100 C on 2 polls in a row, or die > 85 C -> freeze + clamp + charger off; if still
 #               critical after 60 s (or CPU > 105 C) -> poweroff, forced if the orderly one hangs
+#  low battery  <= 15 %: freeze s10-llm until >= 25 % (the cable alone may not cover a heavy model); a 5-point
+#               drop in 30 min while plugged in is logged as a warning (charging not keeping up)
 #  hold         touch /run/s10-charge-hold: charger off until the file is removed (or a reboot)
 #  blind        any zone missing, or all readings frozen for 2 min while busy -> treated as hot
 # Every action is re-asserted, not written once (udev, cable events and new processes can undo them).
@@ -37,6 +39,8 @@ zpath() { for z in /sys/class/thermal/thermal_zone*; do read t < $z/type; [ "$t"
 # Test hooks (unset in service): fake zone files, faster polls, a harmless poweroff.
 [ -n "$GUARD_TEST_ZDIR" ] && zpath() { echo $GUARD_TEST_ZDIR/$1; }
 POLL=${GUARD_TEST_POLL:-2}; POWEROFF=${GUARD_TEST_POWEROFF:-poweroff}
+CAPF=${GUARD_TEST_CAPF:-/sys/class/power_supply/max170xx_battery/capacity}
+LOW=15; LOW_OK=25
 Z0=$(zpath cpucl0-thermal); Z1=$(zpath cpucl1-thermal); Z2=$(zpath cpucl2-thermal)
 ZG=$(zpath g3d-thermal); ZI=$(zpath isp-thermal)
 rz() { v=0; [ -n "$1" ] && read v < $1 2>/dev/null; case "$v" in ''|*[!0-9]*) v=0 ;; esac; }   # -> $v
@@ -81,13 +85,26 @@ housekeeping() {   # once a minute: voltage ceiling, auto-restart, latched charg
     fi
   fi
 }
+battery() {   # once a minute: low-battery freeze, and a warning when the cable is not keeping up
+  rf $CAPF; cap=$v; [ $cap -gt 0 ] || return
+  if [ $lowbat = 0 ] && [ $cap -le $LOW ]; then
+    lowbat=1; freeze 1; log "battery ${cap}% <= ${LOW}%: LLM frozen until ${LOW_OK}%"
+  elif [ $lowbat = 1 ] && [ $cap -ge $LOW_OK ]; then
+    lowbat=0; [ $paused = 0 ] && freeze 0; log "battery ${cap}%: LLM released"
+  fi
+  if [ $((tick % 900)) = 0 ]; then
+    rf $P/online
+    [ $v = 1 ] && [ $capt -ge 0 ] && [ $cap -le $((capt - 5)) ] && log "WARN battery ${capt}% -> ${cap}% in 30 min on the cable"
+    capt=$cap
+  fi
+}
 status() {
   rf $B/voltage_now; vb=$v; rf $B/current_now; ib=$v; rf $B/capacity; cap=$v; rf $P/input_current_limit
   log "status cpu=$cpu die=$isp cell~$((est/1000))C avg=$avg paused=$paused chg=$chg bat=${cap}% ${vb}uV ${ib}uA ilim=$v"
 }
 
 # ---- start: undo anything a previous instance may have left behind ----
-paused=0; chg=1; hot=0; crit=0; blind=0; same=0; last=0; lasti=0; tick=0; GSAVE=
+lowbat=0; capt=-1; paused=0; chg=1; hot=0; crit=0; blind=0; same=0; last=0; lasti=0; tick=0; GSAVE=
 freeze 0; clamp 0
 read gmin < $GPU/min_freq; read gmax < $GPU/max_freq
 if [ "$gmin $gmax" = "156000000 156000000" ]; then     # left clamped by a dead instance
@@ -97,7 +114,7 @@ fi
 rz $ZI; est=$v; [ $est -gt 0 ] || est=50000          # hot reboot: the estimate starts hot, charging waits
 rz $Z0; s1=$v; [ $s1 -gt 0 ] || s1=50000; s2=$s1; s3=$s1; s4=$s1; s5=$s1
 [ $est -gt 48000 ] && chg=0
-charger $chg; housekeeping
+charger $chg; housekeeping; battery
 log "started v2 (die=$est charging=$chg cv<=$CV_MAX cc=$CC_NORM)"
 systemd-notify --ready
 
@@ -135,7 +152,7 @@ while true; do
   if [ $paused = 0 ] && { [ $avg -gt 88000 ] || [ $isp -gt 75000 ]; }; then
     paused=1; freeze 1; clamp 1; log "cpu avg=$avg die=$isp: paused heavy jobs, clocks clamped"
   elif [ $paused = 1 ] && [ $crit = 0 ] && [ $avg -lt 75000 ] && [ $isp -lt 70000 ]; then
-    paused=0; freeze 0; clamp 0; log "cpu avg=$avg die=$isp: resumed heavy jobs"
+    paused=0; [ $lowbat = 0 ] && freeze 0; clamp 0; log "cpu avg=$avg die=$isp: resumed heavy jobs"
   fi
 
   if [ $chg = 1 ] && { [ $isp -gt 60000 ] || [ $est -gt 48000 ]; }; then
@@ -146,10 +163,11 @@ while true; do
 
   if [ $((tick % 5)) = 0 ]; then                      # every 10 s: re-assert, feed the watchdog
     [ $paused = 1 ] && { freeze 1; clamp 1; }
+    [ $lowbat = 1 ] && freeze 1
     charger $chg
     systemd-notify WATCHDOG=1
   fi
-  [ $((tick % 30)) = 0 ] && housekeeping
+  [ $((tick % 30)) = 0 ] && { housekeeping; battery; }
   [ $((tick % 300)) = 0 ] && status
   sleep $POLL
 done
