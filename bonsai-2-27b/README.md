@@ -49,7 +49,10 @@ mkdir -p /home/user/mesa-idp/vendors
 echo /home/user/mesa-idp/libRusticlOpenCL.so.1 > /home/user/mesa-idp/vendors/rusticl-idp.icd
 ```
 
-- Build our fork on the phone with `-DGGML_CPU_S10_GPU_ASSIST=ON` (plus the OpenCL headers and ICD loader).
+- Build our fork on the phone with `-DGGML_CPU_S10_GPU_ASSIST=ON` (plus the OpenCL headers and ICD loader) and the
+  other flags listed in the fork's AGENTS.md ("Build"): without `-DGGML_PTQ1_LEAN2=1` and the arm arch flags the
+  27B aborts or runs about 2x slower. If the build cannot download the web UI, add `-DLLAMA_USE_PREBUILT_UI=OFF
+  -DLLAMA_BUILD_UI=OFF`. The Alpine package `clang23-headers` must be installed, or the GPU assist silently turns off.
 
 ## 3. Run
 
