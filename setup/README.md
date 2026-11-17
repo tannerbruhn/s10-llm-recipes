@@ -6,7 +6,7 @@ postmarketOS device (Wi-Fi, charging, GPU). The LLM recipes build on them.
 - **postmarketOS** on the Galaxy S10 (SM-G973F, `samsung-beyond1lte`).
 - **Kernel:** [tannerbruhn/exynos-9820-mainline-linux](https://github.com/tannerbruhn/exynos-9820-mainline-linux)
   (`main`): Wi-Fi (BCM4375 over PCIe), the MAX77705 charger, Panfrost support for the non-coherent Exynos 9820
-  Mali-G76, and the hardware watchdog. Install notes and known issues: S10-WIFI.md there.
+  Mali-G76, and the hardware watchdog. Install notes and known issues: S10.md there.
 - **Install:** the kernel fork's latest release (v4) has a prebuilt kernel, U-Boot image and an installer that boots
   the new kernel once as a trial before making it the default.
 - **U-Boot:** [tannerbruhn/u-boot](https://github.com/tannerbruhn/u-boot) (`main`): the S10 device tree, with the
