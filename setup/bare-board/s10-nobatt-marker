@@ -1,0 +1,9 @@
+#!/bin/sh
+# One marker line to /dev/kmsg: uptime, MAX77705 charger registers, fuel-gauge power readings.
+# Charger 1-0x69: B2 INT_OK, B3-B5 DETAILS_00-02, B7 CNFG_00, BD CNFG_06, C0 CNFG_09 (input limit, bits 0-6).
+# Gauge 1-0x36 (16-bit): B1 VSYS (0.15625 mV), 43 ISYS (0.3125 mA), D0 IIN (0.125 mA), B3 VBYP (raw).
+c() { i2cget -f -y 1 0x69 0x$1 2>/dev/null || echo ??; }
+g() { v=$(i2cget -f -y 1 0x36 0x$1 w 2>/dev/null) && echo $(( v )) || echo -1; }
+read up _ < /proc/uptime
+vs=$(g b1); is=$(g 43); ii=$(g d0); vb=$(g b3)
+echo "s10-nobatt t=$up int=$(c b2) det=$(c b3)/$(c b4)/$(c b5) cnfg00=$(c b7) cnfg06=$(c bd) cnfg09=$(c c0) VSYS=$((vs * 15625 / 100000))mV ISYS=$((is * 3125 / 10000))mA IIN=$((ii / 8))mA VBYP=$vb" > /dev/kmsg

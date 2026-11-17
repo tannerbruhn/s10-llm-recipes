@@ -1,0 +1,13 @@
+[Unit]
+Description=S10 battery-less test: reboot into the normal entry if a battery is connected
+DefaultDependencies=no
+After=systemd-udevd.service
+Before=s10-thermal-guard.service
+ConditionKernelCommandLine=s10.nobatt=1
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /usr/sbin/s10-nobatt-guardrail
+
+[Install]
+WantedBy=sysinit.target

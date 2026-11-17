@@ -1,4 +1,6 @@
 # Always-plugged-in phone: charge voltage 4.00 V (about 60-65 % state of charge) and charge current 500 mA.
 # Only on "add": the charger sends "change" on every cable event, and s10-thermal-guard owns the current after boot.
 # The guard also holds the voltage at <= 4.00 V, so losing this rule does not mean charging to 4.35 V.
-ACTION=="add", SUBSYSTEM=="power_supply", KERNEL=="max77705-charger", ATTR{constant_charge_voltage}="4000000", ATTR{input_current_limit}="2000000", ATTR{constant_charge_current}="500000"
+# Battery-less test boots (cmdline s10.nobatt=1, no cell present) skip it, so nothing rewrites the charger mid-boot.
+ACTION=="add", SUBSYSTEM=="power_supply", KERNEL=="max77705-charger", IMPORT{cmdline}="s10.nobatt"
+ACTION=="add", SUBSYSTEM=="power_supply", KERNEL=="max77705-charger", ENV{s10.nobatt}!="1", ATTR{constant_charge_voltage}="4000000", ATTR{input_current_limit}="2000000", ATTR{constant_charge_current}="500000"

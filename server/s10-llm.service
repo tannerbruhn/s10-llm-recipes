@@ -12,7 +12,12 @@ Group=user
 # The GPU assist only touches PTQ1_0 weights (the 27B); Ornith never opens OpenCL.
 Environment=LD_LIBRARY_PATH=/home/user/llama-mali/build-mali/bin
 Environment=OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost GGML_OPENCL_PLATFORM=0
-Environment=GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_MINMB=6
+# 27B: the GPU computes 35% of each PTQ1_0 matrix; the CPU's rows run as int2 (experimental, about +0.6 GB of RAM:
+# tg24 1.235 -> 1.34 tok/s). The pool line is optional: it needs the s10cpumem module (setup/cpumem/) and puts the
+# first 184 MB of the int2 data into the modem carve-out; without the device it is skipped. Ornith is not affected.
+# Previous setting: GGML_S10_GPU_FRAC=0.45 and no GGML_S10_INT2 lines.
+Environment=GGML_S10_GPU_FRAC=0.35 GGML_S10_GPU_MINMB=6
+Environment=GGML_S10_INT2=all GGML_S10_INT2_POOL=/dev/s10cpumem GGML_S10_INT2_POOL_MB=184
 # Requests with no or an unknown "model" go to the default model, as with the old single-model server (fork patch).
 Environment=LLAMA_ROUTER_DEFAULT_MODEL=ornith-1.5-9b
 # GPU at Samsung's stock 702 MHz while serving (the governor does not ramp for the bursty assist, so pin it;

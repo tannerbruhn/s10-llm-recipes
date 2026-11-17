@@ -29,6 +29,11 @@ CG=/sys/fs/cgroup/system.slice/s10-llm.service/cgroup.freeze
 GPU=/sys/class/devfreq/18500000.gpu
 PAT='llama-.*|physwatch|memwatch|ptq1bench|microbench|clstream|clbench|test-backend-op|cc1|cc1plus'
 CV_MAX=4000000      # charge voltage ceiling (uV)
+# Bare-board mode (no cell): kernel cmdline s10.nobatt=1 and no /run/s10-cell-present (written by the guardrail when
+# it finds a cell anyway). Then the guard only protects against heat; it leaves the charger alone (the charge-voltage
+# setting is the system-rail target without a cell: keep the driver's 4.35 V) and skips the battery logic.
+NOBATT=0; grep -qw s10.nobatt=1 /proc/cmdline && [ ! -e /run/s10-cell-present ] && NOBATT=1
+NOBATT=${GUARD_TEST_NOBATT:-$NOBATT}   # test hook
 CC_NORM=500000      # charge current when charging is allowed (uA)
 CC_MIN=100000       # driver minimum; used together with charger-off as belt and braces
 CAP4=1898000; CAP6=1976000   # s10-cpucap.service values (A75 pair, M4 pair)
@@ -66,6 +71,7 @@ clamp() {
 reg() { i2cget -f -y $I2C $1 2>/dev/null; }
 regw() { i2cset -f -y $I2C $1 $(printf 0x%02x $2) 2>/dev/null; }
 charger() {   # 1 = charging allowed, 0 = off; re-asserted, writes only on difference
+  [ $NOBATT = 1 ] && return
   set -- $1; [ -e /run/s10-charge-hold ] && set -- 0   # manual hold: touch /run/s10-charge-hold (gone at reboot)
   r=$(reg 0xb7) || r=
   if [ -n "$r" ]; then
@@ -75,6 +81,7 @@ charger() {   # 1 = charging allowed, 0 = off; re-asserted, writes only on diffe
   rf $P/constant_charge_current; [ $v -ne $cc ] && echo $cc > $P/constant_charge_current
 }
 housekeeping() {   # once a minute: voltage ceiling, auto-restart, latched charge
+  [ $NOBATT = 1 ] && return
   rf $P/constant_charge_voltage
   if [ $v -gt $CV_MAX ]; then echo $CV_MAX > $P/constant_charge_voltage; log "charge voltage was $v, set to $CV_MAX"; fi
   r=$(reg 0xb8) && { want=$(( ($r & 0xcf) | 0x10 )); [ $want -ne $(( $r )) ] && regw 0xb8 $want; }  # CHG_RSTRT 150 mV
@@ -86,6 +93,7 @@ housekeeping() {   # once a minute: voltage ceiling, auto-restart, latched charg
   fi
 }
 battery() {   # once a minute: low-battery freeze, and a warning when the cable is not keeping up
+  [ $NOBATT = 1 ] && return
   rf $CAPF; cap=$v; [ $cap -gt 0 ] || return
   if [ $lowbat = 0 ] && [ $cap -le $LOW ]; then
     lowbat=1; freeze 1; log "battery ${cap}% <= ${LOW}%: LLM frozen until ${LOW_OK}%"
@@ -115,7 +123,7 @@ rz $ZI; est=$v; [ $est -gt 0 ] || est=50000          # hot reboot: the estimate 
 rz $Z0; s1=$v; [ $s1 -gt 0 ] || s1=50000; s2=$s1; s3=$s1; s4=$s1; s5=$s1
 [ $est -gt 48000 ] && chg=0
 charger $chg; housekeeping; battery
-log "started v2 (die=$est charging=$chg cv<=$CV_MAX cc=$CC_NORM)"
+log "started v2 (die=$est charging=$chg cv<=$CV_MAX cc=$CC_NORM nobatt=$NOBATT)"
 systemd-notify --ready
 
 while true; do

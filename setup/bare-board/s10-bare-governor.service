@@ -1,0 +1,11 @@
+[Unit]
+Description=S10 bare board: switch from the boot-time powersave governor to schedutil once booted
+After=multi-user.target s10-cpucap.service
+ConditionKernelCommandLine=s10.nobatt=1
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for p in /sys/devices/system/cpu/cpufreq/policy*; do echo schedutil > $p/scaling_governor; done'
+
+[Install]
+WantedBy=multi-user.target

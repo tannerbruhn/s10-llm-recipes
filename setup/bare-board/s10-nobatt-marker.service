@@ -1,0 +1,10 @@
+[Unit]
+Description=S10 battery-less test: marker line every 250 ms to the console
+DefaultDependencies=no
+ConditionKernelCommandLine=s10.nobatt=1
+
+[Service]
+ExecStart=/bin/sh -c 'while :; do /usr/sbin/s10-nobatt-marker; sleep 0.25; done'
+
+[Install]
+WantedBy=sysinit.target

@@ -1,0 +1,1 @@
+obj-m += s10cpumem.o
