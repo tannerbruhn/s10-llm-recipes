@@ -50,6 +50,9 @@ Experimental:
 - The phone setup in [setup/](setup/): postmarketOS with the Wi-Fi and GPU kernel/U-Boot forks.
 - Our llama.cpp fork, [tannerbruhn/llama.cpp-s10](https://github.com/tannerbruhn/llama.cpp-s10) (`main`): the PrismML
   llama.cpp (for PTQ1_0) with ARM kernels for PTQ1_0 and a Mali GPU assist for the 27B.
+  Pre-built for postmarketOS (aarch64, musl) on its
+  [releases page](https://github.com/tannerbruhn/llama.cpp-s10/releases) (`llama-s10-b<build>-<commit>-bin-postmarketos-arm64.tar.gz`,
+  upstream-style naming), or build it on the phone with the flags in the fork's AGENTS.md.
 - For the 27B only: Mesa Rusticl (OpenCL) with a small Bifrost patch, see the 27B recipe.
 
 ## Measuring
