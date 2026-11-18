@@ -1,4 +1,4 @@
-# /dev/s10cpumem: 184 MB of CPU-only memory from the modem carve-out (experimental)
+# /dev/s10cpumem: 184 MB of CPU-only memory from the modem carve-out
 
 The S10's device tree reserves 185 MB at 0xf0000000 for the cellular modem (`modem_if`). Mainline never runs the
 modem, but this range cannot become normal RAM: giving it to Linux makes the boot hang (device DMA there fails; the

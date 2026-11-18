@@ -25,18 +25,25 @@ Updates: [@t24_lab on X](https://x.com/t24_lab)
 |---|---|---|---|---|---|
 | [ornith-1.5-9b](ornith-1.5-9b/) | Ornith 1.5 9B (default) | own IQ4_NL mix + MTP layer, 6.04 GB | ~7.5 | **3.33**; with MTP 3.94 code / 4.48 edits | hard set 6/8 (thinking) |
 | [ornith-1.0-9b](ornith-1.0-9b/) | Ornith 1.0 9B (previous) | own IQ4_NL mix, 5.78 GB | 7.4-7.9 | 3.33 | wikitext PPL 9.23 (BF16 9.04) |
-| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB | ~2.0 | **1.21**; with the int2 CPU kernel (experimental) **1.34** | ternary as published |
+| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB | ~2.0 | **1.21**; with the int2 CPU kernel **1.34** | ternary as published |
 
 All of them run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
 
 Everything else we measured, including what did not work: [results/](results/).
 
-New and experimental (tested on one phone, 2026-11-17):
-- **No battery needed:** the phone boots and serves the 27B on USB power alone ([setup/bare-board/](setup/bare-board/)).
+In daily use on two phones since 2026-11-17 (one served an agent for 15 h overnight without a restart):
 - **int2 CPU kernel** in llama.cpp-s10 for the 27B (+8.5% short answers, +25-58% long ones; output unchanged).
 - **+56 MB of RAM** from two unused reserved-memory regions (U-Boot fork) and **184 MB of CPU-only memory** from the
-  modem carve-out ([setup/cpumem/](setup/cpumem/)); a U-Boot safety hook for trying such changes
-  ([setup/uboot-pin/](setup/uboot-pin/)).
+  modem carve-out ([setup/cpumem/](setup/cpumem/)).
+
+New, tested on one board:
+- **No battery needed:** the phone boots and serves the 27B on USB power alone, with 9 V requested over USB-PD
+  (the 27B browns out a bare board at 5 V) and a fan ([setup/bare-board/](setup/bare-board/)); 7 h of agent use.
+
+Experimental:
+- **Two phones, one model** over llama.cpp RPC ([split/](split/)): the 27B split by layers runs at 1.16 tok/s over
+  Wi-Fi with both phones cool and ~4 GB free on the first; tensor parallel works but needs Ethernet.
+- A U-Boot safety hook for trying device-tree changes ([setup/uboot-pin/](setup/uboot-pin/)).
 
 ## What you need
 

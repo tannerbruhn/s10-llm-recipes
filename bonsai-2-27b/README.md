@@ -11,12 +11,15 @@ recipe makes the CPU read ternary weights as cheaply as possible and gives part 
 | PrismML llama.cpp as published (same 4 cores, clocks capped then) | 0.66 | 0.48 |
 | our fork, CPU only | 1.56-1.66 | 0.85 |
 | **our fork, CPU + GPU (FRAC 0.45)** | **1.98** | **1.21-1.27** |
-| our fork, CPU + GPU (FRAC 0.35) + int2 CPU kernel (experimental, 2026-11-17, second phone) | - | **1.34** (base 1.235 in the same session) |
+| **our fork, CPU + GPU (FRAC 0.35) + int2 CPU kernel (default since 2026-11-17)** | - | **1.34** (base 1.235 in the same session) |
 
 - Sustained: tg128 1.17 tok/s at 702 MHz, with no thermal-guard pauses.
-- int2 (experimental, second phone, which runs hotter): long answers through the server 0.74 -> 1.03-1.17 tok/s
+- int2 (measured first on the second phone, which runs hotter): long answers through the server 0.74 -> 1.03-1.17 tok/s
   from a cool start, 0.69 -> 0.86 straight after another one; the int2 kernel needs fewer instructions, so the
-  phone reaches the thermal guard's pause threshold far less often. Settings: `server/s10-llm.service`.
+  phone reaches the thermal guard's pause threshold far less often. Settings: `server/s10-llm.service`. In daily
+  use on both phones since 2026-11-17; the battery phone served an agent for 15 h overnight without a restart.
+- Bare board on 9 V USB-PD with airflow (2026-11-18), three 256-token answers back to back: 1.27 / 1.17 / 1.12 tok/s
+  with 0-1 guard pauses each (see `setup/bare-board/`).
 - Server, heat-soaked, two 256-token answers back to back: 1.12 then 1.07 tok/s. The second one had one 6 s
   thermal-guard pause (CPU 10 s average 88.2 C), and the guard cut the charge current once (board 61 C).
 - Through the server: one 48-token answer gave prompt 1.80 and generation 1.21 tok/s.

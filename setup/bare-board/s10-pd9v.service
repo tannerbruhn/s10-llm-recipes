@@ -1,0 +1,12 @@
+[Unit]
+Description=S10 bare board: keep the USB input at 9 V (USB-PD through the MAX77705)
+After=multi-user.target
+ConditionKernelCommandLine=s10.nobatt=1
+
+[Service]
+ExecStart=/bin/sh /usr/local/sbin/s10-pd9v
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

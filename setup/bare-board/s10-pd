@@ -1,0 +1,54 @@
+#!/bin/sh
+# s10-pd: talk to the MAX77705's USB-C/PD controller (I2C bus 1, address 0x25) the way Samsung's driver does
+# (drivers/ccic/max77705_usbc.c, max77705_pd.c in the vendor kernel). Mainline binds no driver at 0x25.
+#   s10-pd status        read-only: controller revision, CC/PD status, offered source PDOs, the active one, VBUS
+#   s10-pd request N     ask the source for PDO number N (1 = 5 V; see "status" for the list)
+# Protocol: write [opcode, data...] at 0x21, write 0x00 at 0x41 (end of data); the answer appears at 0x51
+# ([opcode echo, data...]) when UIC_INT (0x02) bit 7 (APCmdResI) is set. Opcodes: 0x30 CURRENT_SRCCAP (31 bytes back:
+# data[1] = active position << 3 | number of PDOs, then 4-byte little-endian PDOs), 0x32 SRCCAP_REQUEST (1 byte: PDO
+# number; answer 0xFE/0xFF = could not be sent).
+A=0x25; BUS=1
+rd() { i2cget -f -y $BUS $A $1 2>/dev/null; }
+cmd() {  # opcode [data bytes...] -> prints the answer bytes (hex, space separated), or fails
+  op=$1; shift
+  rd 0x02 >/dev/null                                      # clear a stale APCmdResI (read-to-clear)
+  i2cset -f -y $BUS $A 0x21 $op "$@" i 2>/dev/null || { echo "write failed" >&2; return 1; }
+  i2cset -f -y $BUS $A 0x41 0x00 2>/dev/null
+  n=0; while :; do
+    v=$(rd 0x02); [ -n "$v" ] && [ $(( v & 0x80 )) -ne 0 ] && break
+    n=$((n+1)); [ $n -ge 60 ] && { echo "no answer (APCmdResI) after 3 s" >&2; break; }
+    sleep 0.05
+  done
+  i2cget -f -y $BUS $A 0x51 i 32 2>/dev/null
+}
+vbus() {  # fuel gauge VBYP (1-0x36 reg 0xB3): 0.427246 mV per count
+  w=$(i2cget -f -y $BUS 0x36 0xb3 w 2>/dev/null) || { echo "?"; return; }
+  echo "$(( (w & 0xfff) * 427246 / 1000000 + (((w & 0xf000) >> 4) * 427246 / 1000000 << 4) )) mV"; }
+pdos() {  # parse the 0x30 answer
+  set -- $(echo "$1" | tr -s ' ')
+  [ $# -ge 2 ] || { echo "empty answer"; return 1; }
+  [ "$(( $1 ))" -eq $(( 0x30 )) ] || echo "warning: answer echoes opcode $1, not 0x30"
+  pos=$(( ($2 >> 3) & 7 )); num=$(( $2 & 7 )); shift 2
+  echo "source offers $num PDO(s), active: $pos"
+  i=1; while [ $i -le $num ] && [ $# -ge 4 ]; do
+    d=$(( $1 | ($2 << 8) | ($3 << 16) | ($4 << 24) )); shift 4
+    t=$(( (d >> 30) & 3 ))
+    case $t in
+      0) echo "  PDO $i: fixed $(( ((d >> 10) & 0x3ff) * 50 )) mV, max $(( (d & 0x3ff) * 10 )) mA";;
+      3) echo "  PDO $i: PPS/APDO $(( ((d >> 8) & 0xff) * 100 ))-$(( ((d >> 17) & 0xff) * 100 )) mV, max $(( (d & 0x7f) * 50 )) mA";;
+      *) echo "  PDO $i: type $t (battery/variable), raw $(printf 0x%08x $d)";;
+    esac
+    i=$((i+1)); done; }
+case "$1" in
+  status)
+    echo "USBC hw=$(rd 0x00) fw=$(rd 0x01).$(rd 0x09) usbc_status=$(rd 0x06)/$(rd 0x07) bc=$(rd 0x08) cc=$(rd 0x0a)/$(rd 0x0b) pd=$(rd 0x0c)/$(rd 0x0d)"
+    echo "VBUS (VBYP) $(vbus), charger input limit $(cat /sys/class/power_supply/max77705-charger/input_current_limit 2>/dev/null) uA"
+    a=$(cmd 0x30) && pdos "$a";;
+  request)
+    [ -n "$2" ] || { echo "usage: s10-pd request N" >&2; exit 2; }
+    a=$(cmd 0x32 $(printf 0x%02x $2)) || exit 1
+    set -- $a; echo "answer: $*"
+    case $(( ${2:-0} )) in 254|255) echo "source not ready / message not sent (0x$(printf %02x $(( $2 ))))"; exit 1;; esac
+    sleep 1; echo "VBUS now $(vbus)";;
+  *) echo "usage: s10-pd status | request N" >&2; exit 2;;
+esac

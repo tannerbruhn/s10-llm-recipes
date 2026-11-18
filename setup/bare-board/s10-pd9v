@@ -1,0 +1,19 @@
+#!/bin/sh
+# Bare board: keep the input at 9 V. Every 20 s: if the source offers a fixed 9 V PDO and it is not the active one
+# (after boot, or after a replug, which starts at 5 V), set the charger input limit to 2 A (9 V x 2 A = 18 W) and
+# request it. Never touches anything when no 9 V PDO is offered.
+P=/sys/class/power_supply/max77705-charger
+while :; do
+  s=$(sh /usr/local/sbin/s10-pd status 2>/dev/null)
+  act=$(echo "$s" | sed -n 's/.*active: \([0-9]\).*/\1/p')
+  n9=$(echo "$s" | sed -n 's/^  PDO \([0-9]\): fixed 9000 mV.*/\1/p' | head -1)
+  if [ -n "$n9" ] && [ -n "$act" ] && [ "$act" != "$n9" ]; then
+    echo 2000000 > $P/input_current_limit
+    if sh /usr/local/sbin/s10-pd request $n9 >/dev/null 2>&1; then
+      echo "s10-pd9v: requested 9 V (PDO $n9, was $act): $(sh /usr/local/sbin/s10-pd status | grep VBUS)"
+    else
+      echo "s10-pd9v: 9 V request (PDO $n9) not accepted, staying at PDO $act"
+    fi
+  fi
+  sleep 20
+done

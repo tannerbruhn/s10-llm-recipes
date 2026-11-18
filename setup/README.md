@@ -17,6 +17,7 @@ postmarketOS device (Wi-Fi, charging, GPU). The LLM recipes build on them.
   and clamp clocks when hot, charging off while the die or the estimated battery temperature is warm, poweroff at
   the critical limits), the clock caps and the charge limit, with an install script. Install them before the LLM
   service. The hardware watchdog resets the phone after 60 s if the system hangs.
-- **Experimental (one phone, 2026-11-17):** [bare-board/](bare-board/) runs the phone without a battery;
-  [cpumem/](cpumem/) exposes 184 MB of the unused modem carve-out as CPU-only memory; [uboot-pin/](uboot-pin/) makes
-  a U-Boot change undo itself at the next boot, so a bad trial costs a restart, not a reflash.
+- [cpumem/](cpumem/) exposes 184 MB of the unused modem carve-out as CPU-only memory (in use on two phones).
+- **New, one board:** [bare-board/](bare-board/) runs the phone without a battery (9 V USB-PD and a fan for the 27B).
+- **Experimental:** [uboot-pin/](uboot-pin/) makes a U-Boot change undo itself at the next boot, so a bad trial costs
+  a restart, not a reflash.
