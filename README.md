@@ -41,7 +41,7 @@ New, tested on one board:
   (the 27B browns out a bare board at 5 V) and a fan ([setup/bare-board/](setup/bare-board/)); 7 h of agent use.
 
 Experimental:
-- **Two phones, one model** over llama.cpp RPC ([split/](split/)): the 27B split by layers runs at 1.16 tok/s over
+- **Two phones, one model** over llama.cpp RPC ([split/](split/)): the 27B split by layers runs at 1.16-1.19 tok/s over
   Wi-Fi with both phones cool and ~4 GB free on the first; tensor parallel works but needs Ethernet.
 - A U-Boot safety hook for trying device-tree changes ([setup/uboot-pin/](setup/uboot-pin/)).
 
