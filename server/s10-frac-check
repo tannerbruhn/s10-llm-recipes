@@ -1,0 +1,15 @@
+#!/bin/sh
+# s10-frac-check [record]: compare the build, CPU clock caps and GPU clock now with what GGML_S10_GPU_FRAC was tuned
+# for (/etc/s10-llm/frac-tuned). Mismatch -> a warning in the journal (rule 7 in llama.cpp-s10 AGENTS.md: re-sweep).
+# "record" stores the current fingerprint (run after a sweep, with the new share in the unit).
+F=/etc/s10-llm/frac-tuned; P=/sys/devices/system/cpu/cpufreq
+BIN=$(systemctl show s10-llm -p ExecStart | grep -o "path=[^ ;]*" | head -1 | cut -d= -f2)
+B=$(LD_LIBRARY_PATH=$(dirname "$BIN") "$BIN" --version 2>&1 | grep -o "build [0-9]*, commit [0-9a-f]*")
+B="$B, sha256 $(sha256sum "$BIN" | cut -c1-12)"
+FRAC=$(systemctl show s10-llm -p Environment | grep -o "GGML_S10_GPU_FRAC=[0-9.]*")
+NOW="$B | M4 cap $(cat $P/policy6/scaling_max_freq) | A75 cap $(cat $P/policy4/scaling_max_freq) | GPU max 702000000 | $FRAC"
+if [ "$1" = record ]; then echo "$NOW" > $F; echo "recorded: $NOW"; exit 0; fi
+[ -f $F ] || { logger -t s10-frac-check "no GPU share fingerprint ($F): run the share sweep (rule 7)"; exit 0; }
+OLD=$(cat $F)
+[ "$OLD" = "$NOW" ] || logger -t s10-frac-check "WARNING: GPU share was tuned for [$OLD], now [$NOW] - re-sweep GGML_S10_GPU_FRAC (rule 7)"
+exit 0

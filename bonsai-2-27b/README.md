@@ -4,7 +4,34 @@ PrismML's Ternary-Bonsai-2-27B has ternary weights (-1/0/+1, one fp16 scale per 
 format the whole 27B is 5.95 GB, which fits in the S10's 8 GB. Generation is limited by memory bandwidth, so this
 recipe makes the CPU read ternary weights as cheaply as possible and gives part of every matrix to the Mali-G76 GPU.
 
-## Result (cpus 4-7: 2 Samsung M4 + 2 Cortex-A75; GPU at the stock 702 MHz; charger on)
+## With MTP on one phone (server default since 2026-11-19)
+
+Bonsai ships without a multi-token-prediction (MTP) head; its base model Qwen3.8-27B has one. Grafted onto Bonsai,
+it guesses one token ahead and the model checks it in a 2-token pass (MTP-1). Greedy, 128-token answers, s10 and the
+bare board, release s10-b12179:
+
+| | prose | code | edits | free RAM at the lowest |
+|---|---|---|---|---|
+| no MTP | 1.31 | 1.33 | 1.19 | ~400 MB |
+| **MTP-1, 4096 context, 8-bit KV** | **1.46** | **1.51** | **1.64** | 184 MB |
+
+72-100% of guesses accepted (prose lowest). What it takes to fit in 8 GB:
+- **Model:** [tanman24/Bonsai-2-27B-S10-GGUF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF), file
+  `Bonsai2-27B-PTQ1_0-Condensed-P2TG-mtp.gguf` (5.94 GB): vocabulary condensed to Latin, code, typography and Greek
+  (-242 MB, perplexity within error bars; other scripts tokenize worse) plus Qwen3.8's MTP head in Q4_0. The same repo
+  has the file without the head (`...-P2TG.gguf`).
+- **llama.cpp-s10 from release s10-b12179 on:** rollback by replay (no snapshot copy of the 48 linear-attention
+  states, -140 MB, default on), the 2-token kernels, and `GGML_S10_MLOCK_SMALL=1` with `LimitMEMLOCK=infinity`
+  (without it the page cache evicts the small weights under MTP's memory pressure and the phone re-reads them from
+  flash on every token: slower than no MTP).
+- **Flags:** `--spec-type draft-mtp --spec-draft-n-max 1 -c 4096 -ctk q8_0 -ctv q8_0 -fa on --ctx-checkpoints 0`.
+  The [server](../server/) preset `bonsai-27b` has all of it; `bonsai-27b-plain` is the same model without MTP.
+- **4096 context counts the answer:** keep prompt + `max_tokens` under ~4000. The server only rejects an over-long
+  prompt; an answer that runs into the limit is cut off (`finish_reason: "length"`).
+- Reboot before a long session if the phone has been up for days: a fresh boot had ~55 MB more free.
+- Not with two phones yet: over RPC the rollback falls back to snapshots.
+
+## Result without MTP (cpus 4-7: 2 Samsung M4 + 2 Cortex-A75; GPU at the stock 702 MHz; charger on)
 
 | Setup | Prompt (pp128) | Generation (tg24) |
 |---|---|---|

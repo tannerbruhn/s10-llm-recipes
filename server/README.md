@@ -6,10 +6,14 @@ stops the current one and loads the requested one.
 
 - [s10-models.ini](s10-models.ini): one section per model, with its threads, cores, context and file. Copy to
   `/etc/s10-llm/s10-models.ini`. Presets: `ornith-1.5-9b` (default, loaded at start), `ornith-1.5-9b-mtp` (same
-  model with MTP speculation, for coding agents and edit jobs), `ornith-1.0-9b`, `bonsai-27b`.
+  model with MTP speculation, for coding agents and edit jobs), `ornith-1.0-9b`, `bonsai-27b` (27B with MTP, 4096
+  context, prompt + answer must fit), `bonsai-27b-plain` (27B without MTP, fallback).
 - [s10-llm.service](s10-llm.service): the systemd unit. It sets the GPU-assist environment (only the 27B's PTQ1_0
   weights use it; Ornith never opens OpenCL), pins the GPU at 702 MHz while it runs, and returns the GPU to a
   433 MHz cap when it stops.
+- [frac-sweep.sh](frac-sweep.sh) and [s10-frac-check](s10-frac-check): the GPU-share sweep for the 27B, and a start-up
+  check (install to `/usr/local/sbin/`) that logs a warning when the build or clocks no longer match the last sweep;
+  `s10-frac-check record` after a sweep. Re-sweep after any kernel, clock or cooling change.
 - [swaptest.sh](swaptest.sh): sends one request per model named and prints the wall time (including any swap) and
   the server's own speeds.
 

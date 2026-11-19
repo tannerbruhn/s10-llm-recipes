@@ -8,14 +8,18 @@ or without MTP speculation.
 
 | | Generation tok/s |
 |---|---|
-| Ornith 1.5, no speculation (server default) | **3.33** on every kind of text |
-| Ornith 1.5 + MTP, code | **3.94** (+18%, 74% of guesses accepted) |
-| Ornith 1.5 + MTP, copy/edit tasks | **4.48** (+35%, 88%) |
-| Ornith 1.5 + MTP, prose | 2.9-3.3 (-2 to -13%, 45-55%) |
+| Ornith 1.5, no speculation (server default) | **3.31-3.33** on every kind of text |
+| Ornith 1.5 + MTP, code | **4.07** (+23%, 74% of guesses accepted) |
+| Ornith 1.5 + MTP, copy/edit tasks | **4.51** (+36%, 86%) |
+| Ornith 1.5 + MTP, prose | **3.46** (+4%, 58%) |
 | Ornith 1.0 (previous default) | 3.33 |
 
-Prompt speed: ~7.5 tok/s. MTP pays when its guesses are accepted more than ~55% of the time (code, edits), so the
-server runs plain 1.5 by default and offers MTP as a separate preset for coding agents.
+Prompt speed: ~7.5 tok/s. MTP numbers from release s10-b12179 (2026-11-19): rollback by replay replaced the
+per-guess state snapshots, which made MTP faster (prose was 2.9-3.3, -2 to -13%, before) and saves 116 MB. The
+server still runs plain 1.5 by default and offers MTP as a separate preset (`ornith-1.5-9b-mtp`).
+
+**Ready-made file:** [tanman24/Ornith-1.5-9B-S10-GGUF](https://huggingface.co/tanman24/Ornith-1.5-9B-S10-GGUF)
+(`Ornith-1.5-9B-S10-m5.gguf`, the exact file this recipe makes). Or make it yourself with the steps below.
 
 | Quality | |
 |---|---|
