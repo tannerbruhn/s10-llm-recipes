@@ -20,6 +20,12 @@ What to know:
 - **The charger latches "Full" and never restarts on its own** with the mainline driver. The guard turns on the
   chip's restart (150 mV below the charge voltage) and restarts a latched charge itself.
 - **The guard holds the charge voltage at 4.00 V or below**, even if the udev rule is lost.
+- **Low battery (<= 15 %) freezes the LLM until 25 %**, and the freeze survives a guard restart. A long hot run can
+  get there with the cable in, because heat keeps the charger off; the guard logs a warning at 30 %. Fixed
+  2026-11-20: the LLM service could hang in "stopping" if it was started or stopped during a freeze.
+- **For benchmarks:** `/run/s10-guard.state` holds one line (`frozen=0|1 freezes=N ...`). On the 27B a single
+  answer from a cool phone can reach the 88 C pause; a timed run during which `freezes` changed was slowed by the
+  guard, so compare runs only with equal pause counts.
 - **The critical poweroff** has not been observed with the cable in. The phone may end up in the bootloader's
   charging screen rather than off. The guard tries hard to cool the phone in Linux first.
 - **Placement matters more than any script:** a non-flammable surface, no case, back glass in free air, out of

@@ -25,7 +25,7 @@ Updates: [@t24_lab on X](https://x.com/t24_lab)
 |---|---|---|---|---|---|
 | [ornith-1.5-9b](ornith-1.5-9b/) | Ornith 1.5 9B (default) | own IQ4_NL mix + MTP layer, 6.04 GB ([HF](https://huggingface.co/tanman24/Ornith-1.5-9B-S10-GGUF)) | ~7.5 | **3.33**; with MTP 4.07 code / 4.51 edits / 3.46 prose | hard set 6/8 (thinking) |
 | [ornith-1.0-9b](ornith-1.0-9b/) | Ornith 1.0 9B (previous) | own IQ4_NL mix, 5.78 GB | 7.4-7.9 | 3.33 | wikitext PPL 9.23 (BF16 9.04) |
-| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB; condensed + MTP head, 5.94 GB ([HF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF)) | ~2.0 | **1.21**; int2 CPU kernel **1.34**; with MTP **1.46-1.64** | ternary as published |
+| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB; condensed + MTP head, 5.94 GB ([HF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF)) | ~2.0 | **1.21**; int2 CPU kernel **1.34**; with MTP **1.46-1.64**, MTP head v2 +3.4% | ternary as published |
 
 All of them run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
 

@@ -15,11 +15,17 @@ bare board, release s10-b12179:
 | no MTP | 1.31 | 1.33 | 1.19 | ~400 MB |
 | **MTP-1, 4096 context, 8-bit KV** | **1.46** | **1.51** | **1.64** | 184 MB |
 
-72-100% of guesses accepted (prose lowest). What it takes to fit in 8 GB:
+72-100% of guesses accepted (prose lowest); measured with the first MTP head.
+
+**MTP head v2 (2026-11-20):** the head retrained on Bonsai's own answers. On the phone (6 mixed prompts, A/B in the
+order old/new/new/old) it needs 3.1% fewer passes: **+3.4% tok/s** with thermal pauses factored out (+2.3% raw), same
+answers. Accepted guesses: prose 57% -> 64%, code 89% -> 96%, short edits 100% both; on a larger set 74.9% -> 83.0%.
+
+What it takes to fit in 8 GB:
 - **Model:** [tanman24/Bonsai-2-27B-S10-GGUF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF), file
-  `Bonsai2-27B-PTQ1_0-Condensed-P2TG-mtp.gguf` (5.94 GB): vocabulary condensed to Latin, code, typography and Greek
-  (-242 MB, perplexity within error bars; other scripts tokenize worse) plus Qwen3.8's MTP head in Q4_0. The same repo
-  has the file without the head (`...-P2TG.gguf`).
+  `Bonsai2-27B-PTQ1_0-Condensed-P2TG-mtp-v2.gguf` (5.94 GB): vocabulary condensed to Latin, code, typography and Greek
+  (-242 MB, perplexity within error bars; other scripts tokenize worse) plus the MTP head (Qwen3.8's, retrained for
+  Bonsai) in Q4_0. The same repo has the first head (`...-P2TG-mtp.gguf`) and the file without a head (`...-P2TG.gguf`).
 - **llama.cpp-s10 from release s10-b12179 on:** rollback by replay (no snapshot copy of the 48 linear-attention
   states, -140 MB, default on), the 2-token kernels, and `GGML_S10_MLOCK_SMALL=1` with `LimitMEMLOCK=infinity`
   (without it the page cache evicts the small weights under MTP's memory pressure and the phone re-reads them from

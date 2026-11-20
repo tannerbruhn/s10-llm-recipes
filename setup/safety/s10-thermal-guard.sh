@@ -17,15 +17,23 @@
 #               critical after 60 s (or CPU > 105 C) -> poweroff, forced if the orderly one hangs
 #  low battery  <= 15 %: freeze s10-llm until >= 25 % (the cable alone may not cover a heavy model); a 5-point
 #               drop in 30 min while plugged in is logged as a warning (charging not keeping up)
+#               a battery <= 30 % while heat holds the charger off is logged as an early warning
 #  hold         touch /run/s10-charge-hold: charger off until the file is removed (or a reboot)
 #  blind        any zone missing, or all readings frozen for 2 min while busy -> treated as hot
 # Every action is re-asserted, not written once (udev, cable events and new processes can undo them).
 # Runs under a systemd watchdog (Type=notify, WatchdogSec): a hung guard is killed and restarted, and
 # s10-llm.service refuses to start without it. Kernel throttling (from 75 C) runs independently.
+# The s10-llm cgroup is frozen only while the unit is active: frozen during start or stop, its own helpers
+# (ExecStartPre, systemctl) hang and the unit wedges (2026-11-20). Outside "active" the unit's processes are left
+# running; every other heavy tool is still SIGSTOPped. A low-battery freeze survives a guard restart (/run flag).
+# State for benchmarks: /run/s10-guard.state, one line "frozen=0|1 freezes=N ..." rewritten every 10 s and on
+# every change. freezes counts freeze events since the guard started: a timed run that saw it change is void.
 
 P=/sys/class/power_supply/max77705-charger
 B=/sys/class/power_supply/max170xx_battery
 CG=/sys/fs/cgroup/system.slice/s10-llm.service/cgroup.freeze
+CGP=/sys/fs/cgroup/system.slice/s10-llm.service/cgroup.procs
+STATE=${GUARD_TEST_STATE:-/run/s10-guard.state}; LOWF=${GUARD_TEST_LOWF:-/run/s10-guard.lowbat}
 GPU=/sys/class/devfreq/18500000.gpu
 PAT='llama-.*|physwatch|memwatch|ptq1bench|microbench|clstream|clbench|test-backend-op|cc1|cc1plus'
 CV_MAX=4000000      # charge voltage ceiling (uV)
@@ -33,6 +41,9 @@ CV_MAX=4000000      # charge voltage ceiling (uV)
 # it finds a cell anyway). Then the guard only protects against heat; it leaves the charger alone (the charge-voltage
 # setting is the system-rail target without a cell: keep the driver's 4.35 V) and skips the battery logic.
 NOBATT=0; grep -qw s10.nobatt=1 /proc/cmdline && [ ! -e /run/s10-cell-present ] && NOBATT=1
+# Dummy battery (a buck converter on the battery connector, no cell): the gauge sees a plausible cell voltage, so the
+# voltage test above cannot tell; the file says it. Same bare-board behaviour: heat protection only, charger untouched.
+[ -e /etc/s10-llm/dummy-battery ] && NOBATT=1
 NOBATT=${GUARD_TEST_NOBATT:-$NOBATT}   # test hook
 CC_NORM=500000      # charge current when charging is allowed (uA)
 CC_MIN=100000       # driver minimum; used together with charger-off as belt and braces
@@ -53,8 +64,21 @@ rf() { v=0; read v < $1 2>/dev/null; case "$v" in ''|*[!0-9-]*) v=0 ;; esac; }
 
 # ---- actions ----
 freeze() {
-  [ -w $CG ] && echo $1 > $CG
-  if [ $1 = 1 ]; then pkill -STOP -x "$PAT"; else pkill -CONT -x "$PAT"; fi
+  if [ $1 = 1 ]; then
+    pkill -STOP -x "$PAT"
+    if [ "$(systemctl show -p ActiveState --value s10-llm.service 2>/dev/null)" = active ]; then
+      [ -w $CG ] && echo 1 > $CG
+    else                                   # starting or stopping: let the unit finish its transition
+      [ -w $CG ] && echo 0 > $CG
+      [ -r $CGP ] && for p in $(cat $CGP); do kill -CONT $p 2>/dev/null; done
+    fi
+  else
+    [ -w $CG ] && echo 0 > $CG; pkill -CONT -x "$PAT"
+  fi
+}
+wstate() {
+  echo "frozen=$(( paused | lowbat )) freezes=$nfrz paused=$paused lowbat=$lowbat chg=$chg cap=$cap cpu=$cpu die=$isp" \
+    > $STATE.tmp 2>/dev/null && mv $STATE.tmp $STATE
 }
 clamp() {
   if [ $1 = 1 ]; then
@@ -74,6 +98,8 @@ charger() {   # 1 = charging allowed, 0 = off; re-asserted, writes only on diffe
   [ $NOBATT = 1 ] && return
   set -- $1; [ -e /run/s10-charge-hold ] && set -- 0   # manual hold: touch /run/s10-charge-hold (gone at reboot)
   r=$(reg 0xb7) || r=
+  # never touch CNFG_00 while the OTG boost (bits 1+3, USB host power for the Ethernet adapter) is on
+  [ -n "$r" ] && [ $(( $r & 0x0a )) -eq $(( 0x0a )) ] && return
   if [ -n "$r" ]; then
     want=$(( ($r & 0xfe) | $1 )); [ $want -ne $(( $r )) ] && regw 0xb7 $want
   fi
@@ -96,10 +122,14 @@ battery() {   # once a minute: low-battery freeze, and a warning when the cable 
   [ $NOBATT = 1 ] && return
   rf $CAPF; cap=$v; [ $cap -gt 0 ] || return
   if [ $lowbat = 0 ] && [ $cap -le $LOW ]; then
-    lowbat=1; freeze 1; log "battery ${cap}% <= ${LOW}%: LLM frozen until ${LOW_OK}%"
+    [ $paused = 0 ] && nfrz=$((nfrz + 1))
+    lowbat=1; touch $LOWF; freeze 1; log "battery ${cap}% <= ${LOW}%: LLM frozen until ${LOW_OK}%"; wstate
   elif [ $lowbat = 1 ] && [ $cap -ge $LOW_OK ]; then
-    lowbat=0; [ $paused = 0 ] && freeze 0; log "battery ${cap}%: LLM released"
+    lowbat=0; rm -f $LOWF; [ $paused = 0 ] && freeze 0; log "battery ${cap}%: LLM released"; wstate
   fi
+  if [ $lowwarn = 0 ] && [ $chg = 0 ] && [ $lowbat = 0 ] && [ $cap -le 30 ]; then
+    lowwarn=1; log "WARN battery ${cap}% and the charger is held off by heat: the LLM freezes at ${LOW}%"
+  elif [ $lowwarn = 1 ] && { [ $chg = 1 ] || [ $cap -gt 35 ]; }; then lowwarn=0; fi
   if [ $((tick % 900)) = 0 ]; then
     rf $P/online
     [ $v = 1 ] && [ $capt -ge 0 ] && [ $cap -le $((capt - 5)) ] && log "WARN battery ${capt}% -> ${cap}% in 30 min on the cable"
@@ -112,7 +142,7 @@ status() {
 }
 
 # ---- start: undo anything a previous instance may have left behind ----
-lowbat=0; capt=-1; paused=0; chg=1; hot=0; crit=0; blind=0; same=0; last=0; lasti=0; tick=0; GSAVE=
+lowbat=0; lowwarn=0; nfrz=0; cap=0; cpu=0; isp=0; capt=-1; paused=0; chg=1; hot=0; crit=0; blind=0; same=0; last=0; lasti=0; tick=0; GSAVE=
 freeze 0; clamp 0
 read gmin < $GPU/min_freq; read gmax < $GPU/max_freq
 if [ "$gmin $gmax" = "156000000 156000000" ]; then     # left clamped by a dead instance
@@ -122,7 +152,10 @@ fi
 rz $ZI; est=$v; [ $est -gt 0 ] || est=50000          # hot reboot: the estimate starts hot, charging waits
 rz $Z0; s1=$v; [ $s1 -gt 0 ] || s1=50000; s2=$s1; s3=$s1; s4=$s1; s5=$s1
 [ $est -gt 48000 ] && chg=0
-charger $chg; housekeeping; battery
+charger $chg; housekeeping
+# a low-battery freeze outlives a guard restart (otherwise a restart between 15 and 25 % would release it)
+[ $NOBATT = 0 ] && [ -e $LOWF ] && { lowbat=1; nfrz=1; freeze 1; log "low-battery freeze carried over from before the restart"; }
+battery; wstate
 log "started v2 (die=$est charging=$chg cv<=$CV_MAX cc=$CC_NORM nobatt=$NOBATT)"
 systemd-notify --ready
 
@@ -144,6 +177,7 @@ while true; do
   # critical: stop all heat first, power off only if that does not work
   if [ $cpu -gt 100000 ]; then hot=$((hot + 1)); else hot=0; fi
   if [ $hot -ge 2 ] || [ $isp -gt 85000 ]; then
+    [ $crit = 0 ] && [ $paused = 0 ] && [ $lowbat = 0 ] && nfrz=$((nfrz + 1))
     [ $crit = 0 ] && log "CRITICAL cpu=$cpu (x$hot) die=$isp: freeze, clamp, charger off"
     crit=$((crit + 1)); paused=1; chg=0; freeze 1; clamp 1; charger 0
     if [ $crit -ge 30 ] || [ $cpu -gt 105000 ]; then
@@ -158,9 +192,10 @@ while true; do
   fi
 
   if [ $paused = 0 ] && { [ $avg -gt 88000 ] || [ $isp -gt 75000 ]; }; then
-    paused=1; freeze 1; clamp 1; log "cpu avg=$avg die=$isp: paused heavy jobs, clocks clamped"
+    [ $lowbat = 0 ] && nfrz=$((nfrz + 1))
+    paused=1; freeze 1; clamp 1; log "cpu avg=$avg die=$isp: paused heavy jobs, clocks clamped"; wstate
   elif [ $paused = 1 ] && [ $crit = 0 ] && [ $avg -lt 75000 ] && [ $isp -lt 70000 ]; then
-    paused=0; [ $lowbat = 0 ] && freeze 0; clamp 0; log "cpu avg=$avg die=$isp: resumed heavy jobs"
+    paused=0; [ $lowbat = 0 ] && freeze 0; clamp 0; log "cpu avg=$avg die=$isp: resumed heavy jobs"; wstate
   fi
 
   if [ $chg = 1 ] && { [ $isp -gt 60000 ] || [ $est -gt 48000 ]; }; then
@@ -172,7 +207,7 @@ while true; do
   if [ $((tick % 5)) = 0 ]; then                      # every 10 s: re-assert, feed the watchdog
     [ $paused = 1 ] && { freeze 1; clamp 1; }
     [ $lowbat = 1 ] && freeze 1
-    charger $chg
+    charger $chg; wstate
     systemd-notify WATCHDOG=1
   fi
   [ $((tick % 30)) = 0 ] && { housekeeping; battery; }
