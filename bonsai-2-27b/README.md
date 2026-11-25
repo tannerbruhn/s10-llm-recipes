@@ -4,6 +4,31 @@ PrismML's Ternary-Bonsai-2-27B has ternary weights (-1/0/+1, one fp16 scale per 
 format the whole 27B is 5.95 GB, which fits in the S10's 8 GB. Generation is limited by memory bandwidth, so this
 recipe makes the CPU read ternary weights as cheaply as possible and gives part of every matrix to the Mali-G76 GPU.
 
+## Current numbers (2026-11-25, release s10-b12189)
+
+Since 2026-11-21 the GPU's share goes straight to the Panfrost kernel driver as pre-compiled Mali-G76 compute jobs
+(`GGML_S10_GPU_DIRECT=1`), not through Mesa's OpenCL: OpenCL's per-call overhead cancelled much of what the GPU
+saved. Output is unchanged (greedy text identical). With it, in the [server](../server/) settings:
+
+| second phone, same prompts | plain generation (tg32) | served with MTP-1 (mean of 8 answers) |
+|---|---|---|
+| OpenCL (Rusticl), share 0.30, release s10-b12179 | 1.29-1.35 tok/s | 1.34 |
+| direct submission, `GGML_S10_T0LAST=1`, shares 0.55 / 0.47 / 0.45 | 1.90 | 1.84 (+37 %) |
+| same with shares 0.60 / 0.52 / 0.50 (this phone runs hot; fewer heat pauses) | 1.75-1.93 | 2.00 (+49 %) |
+
+- First phone: prose answers with MTP at ~2.1 tok/s.
+- `GGML_S10_T0LAST=1`: the thread that drives the GPU (submit, wait, copy back) runs on a big M4 core (+12-14 %).
+- Per-class GPU shares (`GGML_S10_GPU_FRAC_UPGATE` / `_DOWN` / `_OTHER`) beat one share for all matrices (+3 %);
+  KL divergence to CPU-only output is the same at every share tried (0.40-0.60).
+- `--spec-draft-p-min 0.7`: skip the 2-token check when the MTP head is less than 70 % sure. Prose +10-12 %, code
+  level to +4 %, identical output.
+- In-place rollback state for MTP (default on in this release): +3.8 %.
+- Mali-G76 (Bifrost v7) only. Without `GGML_S10_GPU_DIRECT=1`, or if the direct path cannot start, the assist uses
+  OpenCL as before (sections 1-3 below).
+- Checked: Bonsai 2.5 27B (released 2026-11-24) runs at the same speed in the same setup and scores level with
+  Bonsai 2 on our set (IFEval, MMLU-Pro, GSM8K, HumanEval), but writes longer answers (math +41 % tokens); its gains are
+  in agentic work, which needs more context than 4096. We stay on Bonsai 2.
+
 ## With MTP on one phone (server default since 2026-11-19)
 
 Bonsai ships without a multi-token-prediction (MTP) head; its base model Qwen3.8-27B has one. Grafted onto Bonsai,
@@ -69,7 +94,8 @@ What it takes to fit in 8 GB:
   - the GPU assist `ggml-cpu/s10-gpu-assist.c`: on each PTQ1_0 matrix-vector product the GPU computes the first
     `GGML_S10_GPU_FRAC` of the rows while the CPU threads do the rest. Weights are re-encoded for the GPU once,
     at first use, and the CPU's copy of those rows is dropped from RAM.
-- Mesa 26.2.6 Rusticl (OpenCL on Panfrost) with [bifrost-v7-idp.patch](bifrost-v7-idp.patch): Mesa lowers OpenCL's
+- Only for the OpenCL path (not needed with `GGML_S10_GPU_DIRECT=1`, which brings its own pre-compiled kernels):
+  Mesa 26.2.6 Rusticl (OpenCL on Panfrost) with [bifrost-v7-idp.patch](bifrost-v7-idp.patch): Mesa lowers OpenCL's
   int8 `dot()` to scalar code on Bifrost v7 although the G76 has a 4-way int8 dot instruction. With the patch the
   GPU kernel is 43% faster. Build with [build-rusticl.sh](build-rusticl.sh) in an `alpine:edge` aarch64 container
   (postmarketOS is musl).
@@ -77,8 +103,12 @@ What it takes to fit in 8 GB:
 ## 2. Phone setup
 
 - Kernel and U-Boot from [setup/](../setup/): Panfrost support for the Exynos 9820 and the GPU rates up to 702 MHz.
-- Install the patched `libRusticlOpenCL.so` somewhere private (for example `/home/user/mesa-idp/`) and point an ICD
-  file at it:
+- Simplest: the pre-built release ([s10-b12189](https://github.com/tannerbruhn/llama.cpp-s10/releases)), unpacked
+  in `/home/user/`, with `GGML_S10_GPU_DIRECT=1`. The server user needs access to `/dev/dri/renderD128` (group
+  `video`/`render`). The binaries link the OpenCL ICD loader (`opencl-icd-loader`) but never open OpenCL on the
+  direct path.
+- For the OpenCL path only: install the patched `libRusticlOpenCL.so` somewhere private (for example
+  `/home/user/mesa-idp/`) and point an ICD file at it:
 
 ```sh
 mkdir -p /home/user/mesa-idp/vendors
@@ -96,8 +126,10 @@ echo /home/user/mesa-idp/libRusticlOpenCL.so.1 > /home/user/mesa-idp/vendors/rus
 D=/sys/class/devfreq/18500000.gpu        # as root: pin the GPU at 702 MHz while serving
 echo 702000000 > $D/max_freq; echo 702000000 > $D/min_freq
 
-export OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost
-export GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_MINMB=6
+export GGML_S10_GPU_DIRECT=1 GGML_S10_T0LAST=1 GGML_S10_GPU_MINMB=6
+export GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_FRAC_UPGATE=0.55 GGML_S10_GPU_FRAC_DOWN=0.47 GGML_S10_GPU_FRAC_OTHER=0.45
+# OpenCL path instead: drop GGML_S10_GPU_DIRECT, set OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost
+# and GGML_S10_GPU_FRAC=0.30 (no per-class shares)
 llama-server -m /home/user/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf --alias bonsai-27b \
   -t 4 -C 0xf0 --cpu-strict 1 -c 8192 -np 1 --jinja --reasoning-budget 1000 \
   --cache-ram 0 --ctx-checkpoints 4 --host 0.0.0.0 --port 8080 --no-webui --api-key-file /etc/s10-llm/api-key
@@ -110,7 +142,9 @@ Why these settings:
 - **Pin the GPU clock.** The devfreq governor does not raise the clock for the short bursts of GPU work, and the
   assist then waits on a slow GPU. The GPU suspends itself when idle, so the pin costs nothing when no model is
   using it. 702 MHz is Samsung's stock maximum; the firmware (ACPM) sets the voltage for each rate.
-- **FRAC 0.45:** the best share for generation. 0.35 gives 5-10% faster prompts but about 10% slower generation.
+- **Shares:** with direct submission, 0.55 / 0.47 / 0.45 per class; on a phone that runs hot, 0.05 higher moves heat
+  off the CPU (fewer guard pauses). With OpenCL the best share was 0.30-0.45. Re-sweep after any kernel, clock or
+  cooling change ([server/frac-sweep.sh](../server/frac-sweep.sh)).
 - **MINMB 6:** skip tensors under 6 MB (small ones cost more in GPU dispatch than they save).
 - **cpus 4-7, 4 threads, strict:** the OpenCL driver threads stay on the little cores 0-3.
 

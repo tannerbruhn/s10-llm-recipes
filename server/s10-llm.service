@@ -9,14 +9,19 @@ Wants=network-online.target s10-thermal-guard.service
 [Service]
 User=user
 Group=user
-# The GPU assist only touches PTQ1_0 weights (the 27B); Ornith never opens OpenCL.
-Environment=LD_LIBRARY_PATH=/home/user/llama-mali/build-mali/bin
-Environment=OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost GGML_OPENCL_PLATFORM=0
-# 27B: the GPU computes 30% of each PTQ1_0 matrix (re-swept 2026-11-19 with server/frac-sweep.sh: 0.25-0.35 within
-# noise); the CPU's rows run as int2 (about +0.6 GB of RAM). The pool line is optional: it needs the s10cpumem module
-# (setup/cpumem/) and puts the first 184 MB of the int2 data into the modem carve-out; without the device it is skipped.
-# Ornith is not affected. Re-sweep after kernel, clock or cooling changes (s10-frac-check warns at start).
-Environment=GGML_S10_GPU_FRAC=0.30 GGML_S10_GPU_MINMB=6
+# The GPU assist only touches PTQ1_0 weights (the 27B); Ornith never uses the GPU.
+# /home/user/llama-s10 = the unpacked release (llama-s10-b12189-876bcb1 or later), renamed.
+Environment=LD_LIBRARY_PATH=/home/user/llama-s10
+# 27B: the GPU's rows go straight to Panfrost as pre-compiled Mali-G76 compute jobs (no OpenCL), the thread that
+# drives the GPU runs on a big core, and each matrix class has its own GPU share (re-swept 2026-11-23; on a phone
+# that runs hot, 0.60 / 0.52 / 0.50 had fewer guard pauses). The CPU's rows run as int2 (about +0.6 GB of RAM). The
+# pool line is optional: it needs the s10cpumem module (setup/cpumem/) and puts the first 184 MB of the int2 data into
+# the modem carve-out; without the device it is skipped. Ornith is not affected. Re-sweep after kernel, clock or
+# cooling changes (s10-frac-check warns at start).
+# OpenCL path instead (older releases): drop GPU_DIRECT/T0LAST/the class shares, set GGML_S10_GPU_FRAC=0.30 and
+# OCL_ICD_VENDORS=/home/user/mesa-idp/vendors RUSTICL_ENABLE=panfrost GGML_OPENCL_PLATFORM=0 (see bonsai-2-27b/).
+Environment=GGML_S10_GPU_DIRECT=1 GGML_S10_T0LAST=1 GGML_S10_GPU_MINMB=6
+Environment=GGML_S10_GPU_FRAC=0.45 GGML_S10_GPU_FRAC_UPGATE=0.55 GGML_S10_GPU_FRAC_DOWN=0.47 GGML_S10_GPU_FRAC_OTHER=0.45
 Environment=GGML_S10_INT2=all GGML_S10_INT2_POOL=/dev/s10cpumem GGML_S10_INT2_POOL_MB=184
 # 27B with MTP on one phone: lock its small file-backed weights so the page cache cannot evict them (only acts on
 # PTQ1_0 models; without it MTP re-read them from flash on every token).
@@ -30,7 +35,7 @@ Environment=LLAMA_ROUTER_DEFAULT_MODEL=ornith-1.5-9b
 ExecStartPre=-/usr/local/sbin/s10-frac-check
 ExecStartPre=/usr/sbin/systemctl is-active --quiet s10-thermal-guard.service
 ExecStartPre=+/bin/sh -c 'D=/sys/class/devfreq/18500000.gpu; echo 156000000 > $D/min_freq; echo 702000000 > $D/max_freq; echo 702000000 > $D/min_freq'
-ExecStart=/home/user/llama-mali/build-mali/bin/llama-server \
+ExecStart=/home/user/llama-s10/llama-server \
   --models-preset /etc/s10-llm/s10-models.ini --models-max 1 \
   --host 0.0.0.0 --port 8080 --no-webui \
   --api-key-file /etc/s10-llm/api-key

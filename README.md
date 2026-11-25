@@ -25,11 +25,24 @@ Updates: [@t24_lab on X](https://x.com/t24_lab)
 |---|---|---|---|---|---|
 | [ornith-1.5-9b](ornith-1.5-9b/) | Ornith 1.5 9B (default) | own IQ4_NL mix + MTP layer, 6.04 GB ([HF](https://huggingface.co/tanman24/Ornith-1.5-9B-S10-GGUF)) | ~7.5 | **3.33**; with MTP 4.07 code / 4.51 edits / 3.46 prose | hard set 6/8 (thinking) |
 | [ornith-1.0-9b](ornith-1.0-9b/) | Ornith 1.0 9B (previous) | own IQ4_NL mix, 5.78 GB | 7.4-7.9 | 3.33 | wikitext PPL 9.23 (BF16 9.04) |
-| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB; condensed + MTP head, 5.94 GB ([HF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF)) | ~2.0 | **1.21**; int2 CPU kernel **1.34**; with MTP **1.46-1.64**, MTP head v2 +3.4% | ternary as published |
+| [bonsai-2-27b](bonsai-2-27b/) | Ternary Bonsai 2 27B | PrismML PTQ1_0, 5.95 GB; condensed + MTP head, 5.94 GB ([HF](https://huggingface.co/tanman24/Bonsai-2-27B-S10-GGUF)) | ~2.0-2.4 | **1.75-1.93** (direct GPU submission); served with MTP **1.84-2.1** | ternary as published |
 
 All of them run behind one OpenAI-compatible server that swaps between them on demand: see [server/](server/).
 
 Everything else we measured, including what did not work: [results/](results/).
+
+## Status (2026-11-25)
+
+- **The 27B is about 40 % faster than in release s10-b12179:** the GPU assist now submits straight to the Panfrost
+  driver instead of going through OpenCL, the GPU-driving thread sits on a big core, each matrix class has its own GPU
+  share, and the server skips the MTP check when the head is unsure. Served answers with MTP 1.34 -> 1.84-2.00 tok/s
+  on the second phone, ~2.1 on the first, same output ([bonsai-2-27b](bonsai-2-27b/)). Release
+  [s10-b12189](https://github.com/tannerbruhn/llama.cpp-s10/releases); server settings in [server/](server/).
+- **Checked and not adopted:** Bonsai 2.5 27B (same speed, scores level with Bonsai 2 on our set, longer answers; its
+  agentic gains need more context than the phone holds). Inkling 2 Mini: with its intended thinking the 4-bit model
+  beats every model we tested on our set, but the only file that fits a phone (2-bit, pruned to 64 experts) loops
+  while thinking (43 % of answers never finish), so it is out for one phone.
+- Next: the 27B split across two phones over USB-C Ethernet, and better cooling for the bare boards.
 
 In daily use on two phones since 2026-11-17 (one served an agent for 15 h overnight without a restart):
 - **int2 CPU kernel** in llama.cpp-s10 for the 27B (+8.5% short answers, +25-58% long ones; output unchanged).
@@ -58,7 +71,8 @@ Experimental:
   Pre-built for postmarketOS (aarch64, musl) on its
   [releases page](https://github.com/tannerbruhn/llama.cpp-s10/releases) (`llama-s10-b<build>-<commit>-bin-postmarketos-arm64.tar.gz`,
   upstream-style naming), or build it on the phone with the flags in the fork's AGENTS.md.
-- For the 27B only: Mesa Rusticl (OpenCL) with a small Bifrost patch, see the 27B recipe.
+- For the 27B only: nothing extra with the current release (direct GPU submission). Older releases used Mesa Rusticl
+  (OpenCL) with a small Bifrost patch, see the 27B recipe.
 
 ## Measuring
 
@@ -67,4 +81,4 @@ Experimental:
 - Perplexity uses wikitext-2 test, 12 chunks of 512 tokens. A desktop build of the same fork gives the same
   value as the phone within 0.2%, so quality runs can be done off the phone.
 - Heat: the phone runs the thermal guard from [setup/safety](setup/safety/) (pause at a 10 s CPU average above 88 C or
-  a die temperature above 75 C; charging off above a die temperature of 60 C). None of the results here needed a pause.
+  a die temperature above 75 C; charging off above a die temperature of 60 C). Results before 2026-11-21 needed no pause; the second phone's newer numbers include the guard's short pauses (it runs hot), as in service.
